@@ -1,4 +1,4 @@
-use actix_web::{FromRequest, HttpRequest, dev::Payload, Error, HttpMessage};
+use actix_web::{dev::Payload, Error, FromRequest, HttpMessage, HttpRequest};
 use futures_util::future::{ready, Ready};
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +25,8 @@ impl FromRequest for AuthClaims {
         if let Some(claims) = req.extensions().get::<Claims>() {
             return ready(Ok(AuthClaims(claims.clone())));
         }
-        ready(Err(actix_web::error::ErrorUnauthorized("missing auth claims")))
+        ready(Err(actix_web::error::ErrorUnauthorized(
+            "missing auth claims",
+        )))
     }
 }

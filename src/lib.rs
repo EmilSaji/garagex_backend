@@ -1,19 +1,19 @@
 pub mod admin;
+pub mod auth;
 pub mod config;
 pub mod health;
 pub mod routes;
 pub mod state;
-pub mod auth;
 
 use crate::config::Config;
 use crate::state::AppState;
 use actix_cors::Cors;
 use actix_web::http::header;
+use actix_web::middleware::Logger;
 use actix_web::{App, HttpServer};
 use eyre::Result;
 use sqlx::PgPool;
 use std::sync::Arc;
-use actix_web::middleware::Logger;
 
 pub async fn run(cfg: Config) -> Result<()> {
     // Connect to DB
@@ -58,8 +58,8 @@ pub async fn run(cfg: Config) -> Result<()> {
             .app_data(actix_web::web::Data::from(state_for_app))
             .configure(routes::init_routes)
     })
-        .bind(bind_addr)?
-        .run()
-        .await
-        .map_err(|e| eyre::eyre!(e))
+    .bind(bind_addr)?
+    .run()
+    .await
+    .map_err(|e| eyre::eyre!(e))
 }

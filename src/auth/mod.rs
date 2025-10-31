@@ -1,5 +1,5 @@
-pub mod middleware;
 pub mod extractor;
+pub mod middleware;
 
-pub use middleware::AuthMiddleware;
 pub use extractor::AuthClaims;
+pub use middleware::AuthMiddleware;

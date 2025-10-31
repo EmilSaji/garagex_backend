@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use uuid::Uuid;
 
-use crate::admin::models::{AdminLoginRequest, AdminLoginResponse};
+use crate::admin::models::{AdminLoginRequest, AdminLoginResponse, NewGarage};
 use crate::admin::repository::{AdminRepo, GarageRepo};
 
 // Auth extractor
@@ -54,7 +54,9 @@ pub async fn login(
         &claims,
         &EncodingKey::from_secret(secret.as_ref()),
     )
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("token creation error: {}", e)))?;
+    .map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("token creation error: {}", e))
+    })?;
 
     let resp = AdminLoginResponse {
         token,
@@ -92,7 +94,8 @@ pub async fn get_garage(
     path: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let id_str = path.into_inner();
-    let id = Uuid::parse_str(&id_str).map_err(|_| actix_web::error::ErrorBadRequest("invalid id"))?;
+    let id =
+        Uuid::parse_str(&id_str).map_err(|_| actix_web::error::ErrorBadRequest("invalid id"))?;
 
     match GarageRepo::get_garage_by_id(&state.db, id)
         .await
@@ -100,5 +103,40 @@ pub async fn get_garage(
     {
         Some(g) => Ok(HttpResponse::Ok().json(g)),
         None => Err(actix_web::error::ErrorNotFound("garage not found")),
+    }
+}
+
+pub async fn add_garage(
+    _claims: AuthClaims,
+    state: web::Data<crate::state::AppState>,
+    payload: web::Json<NewGarage>,
+) -> Result<HttpResponse, Error> {
+    let pool = &state.db;
+    let new = payload.into_inner();
+
+    let created = GarageRepo::add_garage(pool, &new)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("db error: {}", e)))?;
+
+    Ok(HttpResponse::Created().json(created))
+}
+
+pub async fn delete_garage(
+    _claims: AuthClaims,
+    state: web::Data<crate::state::AppState>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let id_str = path.into_inner();
+    let id =
+        Uuid::parse_str(&id_str).map_err(|_| actix_web::error::ErrorBadRequest("invalid id"))?;
+
+    match GarageRepo::delete_garage_by_id(&state.db, id)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("db error: {}", e)))?
+    {
+        Some(g) => Ok(HttpResponse::Ok().json(g)),
+        None => Err(actix_web::error::ErrorNotFound(
+            "garage not found or already deleted",
+        )),
     }
 }

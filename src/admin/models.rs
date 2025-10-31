@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use serde_json::Value as JsonValue;
 
 #[derive(Debug, FromRow, Serialize)]
 pub struct AdminUser {
@@ -38,4 +39,13 @@ pub struct Garage {
     pub metadata: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NewGarage {
+    pub name: String,
+    pub address: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub metadata: Option<JsonValue>,
 }

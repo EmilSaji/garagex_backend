@@ -3,7 +3,7 @@ use actix_web::{
     Error, HttpMessage,
 };
 use futures_util::future::{ok, LocalBoxFuture, Ready};
-use jsonwebtoken::{decode, Validation, Algorithm};
+use jsonwebtoken::{decode, Algorithm, Validation};
 use std::{env, rc::Rc};
 
 use crate::auth::extractor::Claims;
@@ -88,14 +88,18 @@ where
                 .map(|s| s.to_string());
 
             let token_opt = match auth_header {
-                Some(h) if h.starts_with("Bearer ") => Some(h.trim_start_matches("Bearer ").trim().to_string()),
+                Some(h) if h.starts_with("Bearer ") => {
+                    Some(h.trim_start_matches("Bearer ").trim().to_string())
+                }
                 _ => None,
             };
 
             let token = match token_opt {
                 Some(t) if !t.is_empty() => t,
                 _ => {
-                    return Err(actix_web::error::ErrorUnauthorized("missing or invalid authorization header"));
+                    return Err(actix_web::error::ErrorUnauthorized(
+                        "missing or invalid authorization header",
+                    ));
                 }
             };
 
