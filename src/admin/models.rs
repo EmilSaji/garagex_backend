@@ -49,3 +49,21 @@ pub struct NewGarage {
     pub email: Option<String>,
     pub metadata: Option<JsonValue>,
 }
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct GarageUser {
+    pub id: Uuid,
+    pub garage_id: Uuid,
+    // username / password_hash allowed to be NULL for placeholder accounts
+    pub username: Option<String>,
+    pub password_hash: Option<String>,
+    pub display_name: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub role: String,
+    pub metadata: JsonValue,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
+}

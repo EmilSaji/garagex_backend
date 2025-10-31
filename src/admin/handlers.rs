@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use uuid::Uuid;
 
-use crate::admin::models::{AdminLoginRequest, AdminLoginResponse, NewGarage};
+use crate::admin::models::{AdminLoginRequest, AdminLoginResponse, Garage, NewGarage};
 use crate::admin::repository::{AdminRepo, GarageRepo};
 
 // Auth extractor
@@ -114,11 +114,24 @@ pub async fn add_garage(
     let pool = &state.db;
     let new = payload.into_inner();
 
-    let created = GarageRepo::add_garage(pool, &new)
+    // create garage and placeholder garage user atomically
+    let (created_garage, created_user) = GarageRepo::add_garage_with_admin(pool, &new)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("db error: {}", e)))?;
 
-    Ok(HttpResponse::Created().json(created))
+    // Build response - return garage and the created user id (no password_hash)
+    #[derive(serde::Serialize)]
+    struct Resp {
+        garage: Garage,
+        admin_user_id: Uuid,
+    }
+
+    let resp = Resp {
+        garage: created_garage,
+        admin_user_id: created_user.id,
+    };
+
+    Ok(HttpResponse::Created().json(resp))
 }
 
 pub async fn delete_garage(

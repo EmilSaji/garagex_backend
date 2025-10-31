@@ -1,9 +1,11 @@
-use crate::admin::models::AdminUser;
-use crate::admin::models::{Garage, NewGarage};
 use chrono::Utc;
 use eyre::Result;
-use sqlx::PgPool;
+use serde_json::json;
+use sqlx::{PgPool, Postgres, Transaction}; // <-- Executor is needed
 use uuid::Uuid;
+
+use crate::admin::models::AdminUser;
+use crate::admin::models::{Garage, GarageUser, NewGarage};
 
 pub struct AdminRepo;
 
@@ -78,6 +80,71 @@ impl GarageRepo {
         }
     }
 
+    pub async fn add_garage_with_admin(
+        pool: &PgPool,
+        new: &NewGarage,
+    ) -> Result<(Garage, GarageUser)> {
+        // start a transaction
+        let mut tx: Transaction<'_, Postgres> = pool.begin().await.map_err(|e| eyre::eyre!(e))?;
+
+        // insert garage
+        let gid = Uuid::new_v4();
+        let now = Utc::now();
+
+        let garage: Garage = sqlx::query_as::<_, Garage>(
+            r#"
+    INSERT INTO garages
+        (id, name, address, phone, email, metadata, created_at, updated_at, deleted_at)
+    VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8, NULL)
+    RETURNING id, name, address, phone, email, metadata, created_at, updated_at
+    "#,
+        )
+            .bind(gid)
+            .bind(&new.name)
+            .bind(&new.address)
+            .bind(&new.phone)
+            .bind(&new.email)
+            .bind(&new.metadata)
+            .bind(now)
+            .bind(None::<chrono::DateTime<Utc>>)
+            .fetch_one(&mut *tx) // Single dereference
+            .await
+            .map_err(|e| eyre::eyre!(e))?;
+
+        // insert placeholder garage_user
+        let guid = Uuid::new_v4();
+        let placeholder_metadata = json!({ "needs_setup": true });
+
+        let garage_user: GarageUser = sqlx::query_as::<_, GarageUser>(
+            r#"
+    INSERT INTO garage_users
+        (id, garage_id, username, password_hash, display_name, phone, email, role, metadata, is_active, created_at)
+    VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10)
+    RETURNING id, garage_id, username, password_hash, display_name, phone, email, role, metadata, is_active, created_at, updated_at, deleted_at
+    "#
+        )
+            .bind(guid)
+            .bind(gid)
+            .bind(None::<String>)
+            .bind(None::<String>)
+            .bind(Some(format!("{} Admin", &new.name)))
+            .bind(None::<String>)
+            .bind(None::<String>)
+            .bind("ADMIN")
+            .bind(&placeholder_metadata)
+            .bind(now)
+            .fetch_one(&mut *tx)    // Single dereference
+            .await
+            .map_err(|e| eyre::eyre!(e))?;
+
+        // commit transaction
+        tx.commit().await.map_err(|e| eyre::eyre!(e))?;
+
+        Ok((garage, garage_user))
+    }
+
     pub async fn get_garage_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Garage>> {
         let rec = sqlx::query_as::<_, Garage>(
             r#"
@@ -92,36 +159,6 @@ impl GarageRepo {
         Ok(rec)
     }
 
-    pub async fn add_garage(pool: &PgPool, new: &NewGarage) -> Result<Garage> {
-        // Generate id & timestamps server-side
-        let id = Uuid::new_v4();
-        let now = Utc::now();
-
-        // Use RETURNING * to get the inserted row back as Garage
-        let rec = sqlx::query_as::<_, Garage>(
-            r#"
-            INSERT INTO garages
-                (id, name, address, phone, email, metadata, created_at, updated_at, deleted_at)
-            VALUES
-                ($1, $2, $3, $4, $5, $6, $7, $8, NULL)
-            RETURNING id, name, address, phone, email, metadata, created_at, updated_at, deleted_at
-            "#,
-        )
-        .bind(id)
-        .bind(&new.name)
-        .bind(&new.address)
-        .bind(&new.phone)
-        .bind(&new.email)
-        .bind(&new.metadata)
-        .bind(now)
-        .bind(None::<chrono::DateTime<Utc>>) // updated_at initially NULL
-        .fetch_one(pool)
-        .await
-        .map_err(|e| eyre::eyre!(e))?;
-
-        Ok(rec)
-    }
-
     pub async fn delete_garage_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Garage>> {
         let now = Utc::now();
 
@@ -131,13 +168,13 @@ impl GarageRepo {
             SET deleted_at = $2, updated_at = $2
             WHERE id = $1 AND deleted_at IS NULL
             RETURNING id, name, address, phone, email, metadata, created_at, updated_at, deleted_at
-            "#
+            "#,
         )
-            .bind(id)
-            .bind(now)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| eyre::eyre!(e))?;
+        .bind(id)
+        .bind(now)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| eyre::eyre!(e))?;
 
         Ok(rec)
     }
