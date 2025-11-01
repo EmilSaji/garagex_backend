@@ -182,19 +182,37 @@ impl GarageRepo {
     pub async fn delete_garage_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Garage>> {
         let now = Utc::now();
 
-        let rec = sqlx::query_as::<_, Garage>(
+        let mut tx: Transaction<'_, Postgres> = pool.begin().await.map_err(|e| eyre::eyre!(e))?;
+
+        sqlx::query(
             r#"
-            UPDATE garages
-            SET deleted_at = $2, updated_at = $2
-            WHERE id = $1 AND deleted_at IS NULL
-            RETURNING id, name, address, phone, email, metadata, created_at, updated_at, deleted_at
-            "#,
+        UPDATE garage_users
+        SET deleted_at = $2, updated_at = $2
+        WHERE garage_id = $1 AND deleted_at IS NULL
+        "#,
         )
         .bind(id)
         .bind(now)
-        .fetch_optional(pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| eyre::eyre!(e))?;
+
+        let rec = sqlx::query_as::<_, Garage>(
+            r#"
+        UPDATE garages
+        SET deleted_at = $2, updated_at = $2
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id, name, address, phone, email, metadata, created_at, updated_at, deleted_at
+        "#,
+        )
+        .bind(id)
+        .bind(now)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| eyre::eyre!(e))?;
+
+        // Commit transaction
+        tx.commit().await.map_err(|e| eyre::eyre!(e))?;
 
         Ok(rec)
     }
@@ -268,13 +286,13 @@ impl GarageRepo {
             deleted_at
         "#,
         )
-            .bind(garage_id)
-            .bind(creds.username.as_deref()) // Option<&str> -> maps to SQL NULL or string
-            .bind(creds.password_hash.as_deref()) // NOTE: ideally hash password before storing
-            .bind(now)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| eyre::eyre!(e))?;
+        .bind(garage_id)
+        .bind(creds.username.as_deref()) // Option<&str> -> maps to SQL NULL or string
+        .bind(creds.password_hash.as_deref()) // NOTE: ideally hash password before storing
+        .bind(now)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| eyre::eyre!(e))?;
 
         Ok(rec)
     }
