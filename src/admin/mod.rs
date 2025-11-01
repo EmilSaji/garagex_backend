@@ -15,7 +15,15 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
                     .route("/garages", web::get().to(handlers::list_garages))
                     .route("/garages", web::post().to(handlers::add_garage))
                     .route("/garages/{id}", web::delete().to(handlers::delete_garage))
-                    .route("/garages/{id}", web::get().to(handlers::get_garage)),
+                    .route("/garages/{id}", web::get().to(handlers::get_garage))
+                    .route(
+                        "/garage/update/{id}",
+                        web::post().to(handlers::update_garage),
+                    )
+                    .route(
+                        "/garage/cred/{id}",
+                        web::post().to(handlers::update_garage_credentials),
+                    ),
             ),
     );
 }

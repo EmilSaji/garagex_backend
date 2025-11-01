@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use uuid::Uuid;
 
-use crate::admin::models::{AdminLoginRequest, AdminLoginResponse, Garage, NewGarage};
+use crate::admin::models::{
+    AdminLoginRequest, AdminLoginResponse, Garage, ManageCredentials, NewGarage, UpdateGarage,
+};
 use crate::admin::repository::{AdminRepo, GarageRepo};
 
 // Auth extractor
@@ -150,6 +152,56 @@ pub async fn delete_garage(
         Some(g) => Ok(HttpResponse::Ok().json(g)),
         None => Err(actix_web::error::ErrorNotFound(
             "garage not found or already deleted",
+        )),
+    }
+}
+
+pub async fn update_garage(
+    _claims: AuthClaims,
+    state: web::Data<crate::state::AppState>,
+
+    path: web::Path<String>,
+    payload: web::Json<UpdateGarage>,
+) -> Result<HttpResponse, Error> {
+    let id_str = path.into_inner();
+    let id =
+        Uuid::parse_str(&id_str).map_err(|_| actix_web::error::ErrorBadRequest("invalid id"))?;
+
+    // consume the web::Json wrapper and get owned UpdateGarage
+    let update = payload.into_inner();
+
+    let updated = GarageRepo::update_garage_by_id(&state.db, id, &update)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("db error: {}", e)))?;
+
+    match updated {
+        Some(g) => Ok(HttpResponse::Ok().json(g)),
+        None => Err(actix_web::error::ErrorNotFound("garage not found")),
+    }
+}
+
+pub async fn update_garage_credentials(
+    _claims: AuthClaims,
+    state: web::Data<crate::state::AppState>,
+    path: web::Path<String>,
+    payload: web::Json<ManageCredentials>,
+) -> Result<HttpResponse, Error> {
+    let id_str = path.into_inner();
+    let garage_id =
+        Uuid::parse_str(&id_str).map_err(|_| actix_web::error::ErrorBadRequest("invalid id"))?;
+
+    let updated = GarageRepo::manage_garage_credentials(
+        &state.db,
+        garage_id,
+        &payload.into_inner(),
+    )
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(format!("db error: {}", e)))?;
+
+    match updated {
+        Some(u) => Ok(HttpResponse::Ok().json(u)),
+        None => Err(actix_web::error::ErrorNotFound(
+            "admin user not found for this garage",
         )),
     }
 }
