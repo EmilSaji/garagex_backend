@@ -123,7 +123,7 @@ impl GarageRepo {
     INSERT INTO garage_users
         (id, garage_id, username, password_hash, display_name, phone, email, role, metadata, is_active, created_at)
     VALUES
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10)
     RETURNING id, garage_id, username, password_hash, display_name, phone, email, role, metadata, is_active, created_at, updated_at, deleted_at
     "#
         )

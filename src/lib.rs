@@ -1,15 +1,16 @@
 pub mod admin;
 pub mod auth;
+pub mod garage;
 pub mod config;
 pub mod health;
 pub mod routes;
 pub mod state;
 
+use actix_web::middleware::Logger;
 use crate::config::Config;
 use crate::state::AppState;
 use actix_cors::Cors;
 use actix_web::http::header;
-use actix_web::middleware::Logger;
 use actix_web::{App, HttpServer};
 use eyre::Result;
 use sqlx::PgPool;

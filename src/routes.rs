@@ -5,5 +5,6 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/api")
             .route("/health", web::get().to(crate::health::health_handler))
             .configure(crate::admin::init_routes) // no semicolon here
+            .configure(crate::garage::init_routes)
     );
 }

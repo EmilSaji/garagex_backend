@@ -1,8 +1,4 @@
 use actix_web::{web, Error, HttpResponse};
-use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header};
-use serde::{Deserialize, Serialize};
-use std::env;
 use uuid::Uuid;
 
 use crate::admin::models::{
@@ -12,14 +8,7 @@ use crate::admin::repository::{AdminRepo, GarageRepo};
 
 // Auth extractor
 use crate::auth::AuthClaims;
-
-#[derive(Serialize, Deserialize, Clone)]
-struct ClaimsLocal {
-    sub: String,
-    username: String,
-    role: String,
-    exp: usize,
-}
+use crate::auth::create_token;
 
 /// Public login handler
 pub async fn login(
@@ -41,24 +30,14 @@ pub async fn login(
         return Ok(HttpResponse::Unauthorized().body("invalid credentials"));
     }
 
-    // Build JWT
-    let secret = env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret".into());
-    let expiration = Utc::now() + Duration::hours(24);
-    let claims = ClaimsLocal {
-        sub: admin.id.to_string(),
-        username: admin.username.clone(),
-        role: "ADMIN".to_string(),
-        exp: expiration.timestamp() as usize,
-    };
-
-    let token = encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_ref()),
+    // Build JWT via centralized helper
+    let token = create_token(
+        admin.id.to_string(),
+        admin.username.clone(),
+        "ADMIN".to_string(),
+        24,
     )
-    .map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("token creation error: {}", e))
-    })?;
+    .map_err(|e| actix_web::error::ErrorInternalServerError(format!("token creation error: {}", e)))?;
 
     let resp = AdminLoginResponse {
         token,
